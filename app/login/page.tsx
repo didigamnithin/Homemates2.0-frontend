@@ -243,7 +243,7 @@ export default function LoginPage() {
         )}
         
         <div className="w-full flex flex-col items-center justify-center px-4 space-y-12 relative z-10">
-          {/* Vapour Effect */}
+          {/* Vapour Effect - Top Line */}
           <div className="w-full max-w-6xl flex items-center justify-center relative z-20">
             <VaporizeTextCycle
               texts={["Long Flat listings :("]}
@@ -264,6 +264,13 @@ export default function LoginPage() {
               alignment="center"
               tag={Tag.H1}
             />
+          </div>
+          
+          {/* Static Text - Bottom Line */}
+          <div className="w-full max-w-6xl flex items-center justify-center relative z-20 mt-4">
+            <h2 className="text-6xl md:text-7xl font-bold text-black" style={{ fontFamily: "Inter, sans-serif" }}>
+              Futuristic Voice Agents :)
+            </h2>
           </div>
           
           {/* Orb */}
