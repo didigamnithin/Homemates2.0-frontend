@@ -9,13 +9,10 @@ import { Select } from '@/components/ui/select'
 import { apiClient } from '@/lib/api/client'
 import { useAuthStore } from '@/lib/store/auth'
 import { useRouter } from 'next/navigation'
-import { Search, MapPin, Bed, Square, IndianRupee, Phone, Sparkles } from 'lucide-react'
-import InboundAgent from '@/components/agents/InboundAgent'
+import { Search, MapPin, Bed, Square, IndianRupee, Globe } from 'lucide-react'
 import ShaderBackground from '@/components/ui/ShaderBackground'
-import dynamic from 'next/dynamic'
-
-// Dynamically import InboundAgent to avoid SSR issues
-const InboundAgentDynamic = dynamic(() => import('@/components/agents/InboundAgent'), { ssr: false })
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 
 interface Property {
   property_id: string
@@ -47,8 +44,10 @@ export default function PropertiesPage() {
     status: 'available',
     search: ''
   })
-  const [showInboundAgent, setShowInboundAgent] = useState(false)
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
+  const [showSearchDialog, setShowSearchDialog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
 
   useEffect(() => {
     if (userType === 'tenant') {
@@ -146,14 +145,37 @@ export default function PropertiesPage() {
     }
   }
 
-  const handleCall = (property: Property) => {
-    setSelectedProperty(property)
-    setShowInboundAgent(true)
-  }
 
   const getUniqueCities = () => {
     const cities = new Set(properties.map(p => p.city).filter(Boolean))
     return Array.from(cities).sort()
+  }
+
+  const handleSearchInternet = async () => {
+    if (!searchQuery.trim()) {
+      alert('Please enter a search query')
+      return
+    }
+
+    try {
+      setIsSearching(true)
+      const response = await apiClient.post('/database/search', {
+        query: searchQuery,
+        max_results: 20
+      })
+
+      // Combine results and listings for display
+      const allResults = [
+        ...(response.data.results || []),
+        ...(response.data.listings || [])
+      ]
+      setSearchResults(allResults)
+    } catch (error: any) {
+      console.error('Failed to search:', error)
+      alert(error.response?.data?.message || error.message || 'Failed to search internet')
+    } finally {
+      setIsSearching(false)
+    }
   }
 
   if (isLoading) {
@@ -171,12 +193,6 @@ export default function PropertiesPage() {
     <div className="min-h-screen relative p-4 md:p-8">
       <ShaderBackground />
       <div className="relative z-10">
-        {showInboundAgent && selectedProperty && userType === 'tenant' && (
-          <InboundAgentDynamic 
-            calleeName={selectedProperty.owner_name || 'Owner'}
-            propertyCode={selectedProperty.property_code}
-          />
-        )}
 
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-8 gap-4">
@@ -190,14 +206,25 @@ export default function PropertiesPage() {
                 : 'All your properties'}
             </p>
           </div>
-          {userType === 'owner' && (
-            <Button 
-              onClick={() => router.push('/dashboard/properties-owner')}
-              className="homie-gradient text-white shadow-lg hover:shadow-xl transition-all"
-            >
-              Add Property
-            </Button>
-          )}
+          <div className="flex gap-3">
+            {userType === 'tenant' && (
+              <Button 
+                onClick={() => setShowSearchDialog(true)}
+                className="homie-gradient text-white shadow-lg hover:shadow-xl transition-all"
+              >
+                <Globe className="w-4 h-4 mr-2" />
+                Search Internet
+              </Button>
+            )}
+            {userType === 'owner' && (
+              <Button 
+                onClick={() => router.push('/dashboard/properties-owner')}
+                className="homie-gradient text-white shadow-lg hover:shadow-xl transition-all"
+              >
+                Add Property
+              </Button>
+            )}
+          </div>
           </div>
 
         {/* Filters - Mobile Responsive */}
@@ -334,46 +361,121 @@ export default function PropertiesPage() {
                     </div>
                   )}
 
-                  {userType === 'tenant' && (
-                    <Button
-                      onClick={() => handleCall(property)}
-                      className="w-full call-homie-button text-white font-semibold py-4 md:py-6 text-sm md:text-lg flex items-center justify-center gap-2"
-                      size="lg"
-                    >
-                      <Sparkles className="h-4 w-4 md:h-5 md:w-5" />
-                      Call Homie
-                      <Phone className="h-4 w-4 md:h-5 md:w-5" />
-                    </Button>
-                  )}
                 </CardContent>
               </Card>
             ))
           )}
         </div>
 
-        {/* Call Homie Banner for Tenants */}
-        {userType === 'tenant' && properties.length > 0 && (
-          <Card className="mt-6 shadow-xl border-0 homie-gradient text-white">
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-xl md:text-2xl font-bold mb-2 flex items-center gap-2">
-                    <Sparkles className="h-6 w-6" />
-                    Our Best-in-Class Real Estate Voice Agent
-                  </h3>
-                  <p className="text-white/90 text-sm md:text-base">
-                    Click "Call Homie" on any property to connect with our AI-powered voice agent
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-8 w-8 animate-pulse" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
         </div>
       </div>
+
+      {/* Search Internet Dialog */}
+      <Dialog open={showSearchDialog} onOpenChange={setShowSearchDialog}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Search Internet</DialogTitle>
+            <DialogDescription>
+              Search for properties and real estate information using Perplexity AI
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <Label htmlFor="search-query">Search Query</Label>
+              <Textarea
+                id="search-query"
+                placeholder="e.g., 2 BHK flats for rent in Hyderabad under 25000"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="mt-2 min-h-[100px]"
+              />
+            </div>
+
+            <Button
+              onClick={handleSearchInternet}
+              disabled={isSearching || !searchQuery.trim()}
+              className="w-full homie-gradient text-white"
+            >
+              {isSearching ? 'Searching...' : 'Search'}
+            </Button>
+
+            {searchResults.length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-4">
+                  Search Results ({searchResults.length})
+                </h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse border border-gray-300">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border border-gray-300 px-4 py-2 text-left">Title</th>
+                        <th className="border border-gray-300 px-4 py-2 text-left">URL</th>
+                        <th className="border border-gray-300 px-4 py-2 text-left">Snippet</th>
+                        <th className="border border-gray-300 px-4 py-2 text-left">Price</th>
+                        <th className="border border-gray-300 px-4 py-2 text-left">Location</th>
+                        <th className="border border-gray-300 px-4 py-2 text-left">BHK</th>
+                        <th className="border border-gray-300 px-4 py-2 text-left">Area</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {searchResults.map((result, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="border border-gray-300 px-4 py-2">
+                            {result.title || result.project_name || 'N/A'}
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2">
+                            {result.url || result.source_url ? (
+                              <a
+                                href={result.url || result.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-homie-blue hover:underline"
+                              >
+                                {result.url || result.source_url}
+                              </a>
+                            ) : (
+                              'N/A'
+                            )}
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2 max-w-md">
+                            <p className="text-sm line-clamp-3">
+                              {result.snippet || result.description || 'N/A'}
+                            </p>
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2">
+                            {result.price || 'N/A'}
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2">
+                            {result.location || result.locality || 'N/A'}
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2">
+                            {result.bhk_configuration || result.bedrooms || 'N/A'}
+                          </td>
+                          <td className="border border-gray-300 px-4 py-2">
+                            {result.area_sqft || 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSearchDialog(false)
+                setSearchQuery('')
+                setSearchResults([])
+              }}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

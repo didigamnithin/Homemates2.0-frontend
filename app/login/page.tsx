@@ -11,7 +11,14 @@ import { Marquee } from '@/components/ui/3d-testimonials'
 import VaporizeTextCycle, { Tag } from '@/components/ui/vapour-text-effect'
 import { VoicePoweredOrb } from '@/components/ui/voice-powered-orb'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import OutboundAgent from '@/components/agents/OutboundAgent'
+import dynamic from 'next/dynamic'
+
+// Dynamically import OutboundAgent to avoid SSR issues
+const OutboundAgentDynamic = dynamic(() => import('@/components/agents/OutboundAgent'), { ssr: false })
 
 interface Flat {
   property_id?: string
@@ -158,23 +165,53 @@ export default function LoginPage() {
 
   const [isRecording, setIsRecording] = useState(false)
   const [voiceDetected, setVoiceDetected] = useState(false)
+  const [showReceiveCallDialog, setShowReceiveCallDialog] = useState(false)
   const [showOutboundAgent, setShowOutboundAgent] = useState(false)
+  const [mobileNumber, setMobileNumber] = useState('')
+  const [userName, setUserName] = useState('')
 
   const handlePortalSelect = (userType: 'tenant' | 'owner') => {
     setUserType(userType)
     router.push('/dashboard')
   }
 
-  const toggleRecording = () => {
-    if (!isRecording) {
-      // Trigger outbound call agent when starting
-      setShowOutboundAgent(true)
-      setIsRecording(true)
-    } else {
-      // Stop recording and hide agent
-      setIsRecording(false)
-      setShowOutboundAgent(false)
+  const handleReceiveCall = () => {
+    setShowReceiveCallDialog(true)
+  }
+
+  const handleInitiateCall = () => {
+    if (!mobileNumber || mobileNumber.trim() === '') {
+      alert('Please enter a mobile number')
+      return
     }
+    
+    // Validate mobile number (basic validation)
+    const phoneRegex = /^[0-9]{10}$/
+    const cleanedNumber = mobileNumber.replace(/[\s\-\(\)]/g, '')
+    
+    if (!phoneRegex.test(cleanedNumber) && cleanedNumber.length < 10) {
+      alert('Please enter a valid 10-digit mobile number')
+      return
+    }
+    
+    setShowReceiveCallDialog(false)
+    setShowOutboundAgent(true)
+  }
+
+  const handleCallInitiated = (callId: string) => {
+    console.log('Call initiated:', callId)
+    setShowOutboundAgent(false)
+    setIsRecording(false)
+    setMobileNumber('')
+    setUserName('')
+    alert('Call initiated successfully!')
+  }
+
+  const handleCallError = (error: string) => {
+    console.error('Call error:', error)
+    setShowOutboundAgent(false)
+    setIsRecording(false)
+    alert(`Failed to initiate call: ${error}`)
   }
 
   return (
@@ -193,30 +230,23 @@ export default function LoginPage() {
 
       {/* Section 1: Vapour Effect + Orb */}
       <section className="min-h-screen flex flex-col items-center justify-center relative z-10 py-20">
-            {/* Outbound Agent */}
-            {showOutboundAgent && (
-              <div className="fixed inset-0 z-50">
-                <OutboundAgent
-                  calleeName="User"
-                  mobileNumber="7095288950"
-                  onCallInitiated={(callId) => {
-                    console.log('Call initiated:', callId)
-                    setShowOutboundAgent(false)
-                  }}
-                  onError={(error) => {
-                    console.error('Call error:', error)
-                    alert(`Failed to initiate call: ${error}`)
-                    setShowOutboundAgent(false)
-                  }}
-                />
-              </div>
-            )}
+        {/* Outbound Agent */}
+        {showOutboundAgent && (
+          <div className="fixed inset-0 z-50">
+            <OutboundAgentDynamic
+              calleeName={userName || 'User'}
+              mobileNumber={mobileNumber}
+              onCallInitiated={handleCallInitiated}
+              onError={handleCallError}
+            />
+          </div>
+        )}
         
         <div className="w-full flex flex-col items-center justify-center px-4 space-y-12 relative z-10">
           {/* Vapour Effect */}
           <div className="w-full max-w-6xl flex items-center justify-center relative z-20">
             <VaporizeTextCycle
-              texts={["Long Listings&Hustle", "Futuristic Voice Agents"]}
+              texts={["Long Flat listings :("]}
               font={{
                 fontFamily: "Inter, sans-serif",
                 fontSize: "80px",
@@ -246,27 +276,73 @@ export default function LoginPage() {
             />
           </div>
           
-          {/* Control Button */}
+          {/* Receive Call Button */}
           <Button
-            onClick={toggleRecording}
-            variant={isRecording ? "destructive" : "default"}
+            onClick={handleReceiveCall}
             size="lg"
-            className="px-8 py-3 bg-white/90 backdrop-blur-sm text-homie-blue hover:bg-white shadow-lg z-20"
+            className="px-8 py-3 homie-gradient text-white shadow-lg hover:shadow-xl transition-all z-20"
           >
-            {isRecording ? (
-              <>
-                <MicOff className="w-5 h-5 mr-3" />
-                Call Conncted 
-              </>
-            ) : (
-              <>
-                <Mic className="w-5 h-5 mr-3" />
-                Get a call
-              </>
-            )}
+            <Phone className="w-5 h-5 mr-3" />
+            Receive Call
           </Button>
         </div>
       </section>
+
+      {/* Receive Call Dialog */}
+      <Dialog open={showReceiveCallDialog} onOpenChange={setShowReceiveCallDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Receive Call</DialogTitle>
+            <DialogDescription>
+              Enter your mobile number and we'll call you right away!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Your Name (Optional)</Label>
+              <Input
+                id="name"
+                placeholder="Enter your name"
+                value={userName}
+                onChange={(e) => setUserName(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="mobile">Mobile Number *</Label>
+              <Input
+                id="mobile"
+                type="tel"
+                placeholder="Enter 10-digit mobile number"
+                value={mobileNumber}
+                onChange={(e) => setMobileNumber(e.target.value)}
+                maxLength={10}
+              />
+              <p className="text-xs text-muted-foreground">
+                We'll call you on this number
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowReceiveCallDialog(false)
+                setMobileNumber('')
+                setUserName('')
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleInitiateCall}
+              className="homie-gradient text-white"
+            >
+              <Phone className="w-4 h-4 mr-2" />
+              Call Me Now
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Section 2: Scrolling Element */}
       <section className="min-h-screen flex items-center justify-center relative z-10">

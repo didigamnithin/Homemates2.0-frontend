@@ -8,13 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { apiClient } from '@/lib/api/client'
-import { Search, Phone, Mail, MapPin, Calendar, CheckCircle, XCircle, Sparkles } from 'lucide-react'
-import OutboundAgent from '@/components/agents/OutboundAgent'
+import { Search, Phone, Mail, MapPin, Calendar, CheckCircle, XCircle } from 'lucide-react'
 import ShaderBackground from '@/components/ui/ShaderBackground'
-import dynamic from 'next/dynamic'
-
-// Dynamically import OutboundAgent to avoid SSR issues
-const OutboundAgentDynamic = dynamic(() => import('@/components/agents/OutboundAgent'), { ssr: false })
 
 interface Lead {
   lead_id: string
@@ -39,6 +34,7 @@ interface Lead {
     budget_max?: string
     bedrooms?: string
     amenities?: string
+    preferences?: string
   }
   property?: {
     property_id: string
@@ -59,8 +55,6 @@ export default function LeadsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
-  const [showAgent, setShowAgent] = useState(false)
-  const [selectedTenant, setSelectedTenant] = useState<Lead | null>(null)
   const [filters, setFilters] = useState({
     status: 'new',
     search: ''
@@ -122,14 +116,6 @@ export default function LeadsPage() {
     }
   }
 
-  const handleCall = (lead: Lead) => {
-    if (!lead.tenant?.phone) {
-      alert('Phone number not available for this lead')
-      return
-    }
-    setSelectedTenant(lead)
-    setShowAgent(true)
-  }
 
   const formatMatchScore = (score: string) => {
     const numScore = parseFloat(score) * 100
@@ -151,23 +137,6 @@ export default function LeadsPage() {
     <div className="min-h-screen relative p-4 md:p-8">
       <ShaderBackground />
       <div className="relative z-10">
-        {showAgent && selectedTenant && (
-          <OutboundAgentDynamic 
-            calleeName={selectedTenant.tenant?.name || 'Tenant'}
-            tenantId={selectedTenant.tenant_id}
-            mobileNumber={selectedTenant.tenant?.phone}
-            onCallInitiated={(callId) => {
-              console.log('Call initiated:', callId)
-              setShowAgent(false)
-              alert('Call initiated successfully!')
-            }}
-            onError={(error) => {
-              console.error('Call error:', error)
-              alert(`Failed to initiate call: ${error}`)
-              setShowAgent(false)
-            }}
-          />
-        )}
 
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-8 gap-4">
@@ -264,37 +233,52 @@ export default function LeadsPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div>
-                    {lead.property ? (
-                      <>
-                        <p className="text-sm font-semibold mb-1">{lead.property.title || 'N/A'}</p>
-                        <p className="text-xs text-muted-foreground">Code: {lead.property_code || 'N/A'}</p>
-                        {lead.property.locality && (
-                          <p className="text-xs text-muted-foreground mt-1">{lead.property.locality}</p>
-                        )}
-                        {lead.property.rent && (
-                          <p className="text-sm font-bold text-homie-blue mt-1">₹{lead.property.rent}</p>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm font-semibold mb-1 text-gray-500">No matching property</p>
-                        <p className="text-xs text-muted-foreground">
-                          {lead.tenant?.localities && `Looking in: ${lead.tenant.localities}`}
-                        </p>
-                        {lead.tenant?.budget_min && lead.tenant?.budget_max && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Budget: ₹{lead.tenant.budget_min} - ₹{lead.tenant.budget_max}
-                          </p>
-                        )}
-                        {lead.tenant?.bedrooms && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {lead.tenant.bedrooms} BHK
-                          </p>
-                        )}
-                      </>
+                  {/* Tenant Requirements from tenants.csv */}
+                  <div className="space-y-2">
+                    {lead.tenant?.localities && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <MapPin className="h-4 w-4 text-homie-blue" />
+                        <span className="text-muted-foreground">Locality: <span className="font-medium text-foreground">{lead.tenant.localities}</span></span>
+                      </div>
+                    )}
+                    {lead.tenant?.budget_min && lead.tenant?.budget_max && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Budget: <span className="font-bold text-homie-blue">₹{lead.tenant.budget_min} - ₹{lead.tenant.budget_max}</span></span>
+                      </div>
+                    )}
+                    {lead.tenant?.bedrooms && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">BHK Type: <span className="font-medium text-foreground">{lead.tenant.bedrooms} BHK</span></span>
+                      </div>
+                    )}
+                    {lead.tenant?.amenities && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Must Need Amenities: </span>
+                        <span className="font-medium text-foreground">{lead.tenant.amenities}</span>
+                      </div>
+                    )}
+                    {lead.tenant?.preferences && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Others: </span>
+                        <span className="font-medium text-foreground">{lead.tenant.preferences}</span>
+                      </div>
                     )}
                   </div>
+
+                  {/* Matching Property (if any) */}
+                  {lead.property && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground mb-1">Matching Property:</p>
+                      <p className="text-sm font-semibold mb-1">{lead.property.title || 'N/A'}</p>
+                      <p className="text-xs text-muted-foreground">Code: {lead.property_code || 'N/A'}</p>
+                      {lead.property.locality && (
+                        <p className="text-xs text-muted-foreground mt-1">{lead.property.locality}</p>
+                      )}
+                      {lead.property.rent && (
+                        <p className="text-sm font-bold text-homie-blue mt-1">₹{lead.property.rent}</p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between pt-2 border-t">
                     <div>
@@ -336,18 +320,9 @@ export default function LeadsPage() {
                         setSelectedLead(lead)
                         setIsDetailOpen(true)
                       }}
-                      className="flex-1"
+                      className="w-full"
                     >
-                      View
-                    </Button>
-                    <Button
-                      onClick={() => handleCall(lead)}
-                      className="flex-1 call-homie-button text-white font-semibold flex items-center justify-center gap-2"
-                      size="sm"
-                    >
-                      <Sparkles className="h-4 w-4" />
-                      Call Homie
-                      <Phone className="h-4 w-4" />
+                      View Details
                     </Button>
                   </div>
                 </CardContent>
@@ -356,27 +331,6 @@ export default function LeadsPage() {
           )}
         </div>
 
-        {/* Call Homie Banner for Owners */}
-        {leads.length > 0 && (
-          <Card className="shadow-xl border-0 homie-gradient text-white">
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-xl md:text-2xl font-bold mb-2 flex items-center gap-2">
-                    <Sparkles className="h-6 w-6" />
-                    Our Best-in-Class Real Estate Voice Agent
-                  </h3>
-                  <p className="text-white/90 text-sm md:text-base">
-                    Click "Call Homie" on any lead to connect with our AI-powered voice agent
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Phone className="h-8 w-8 animate-pulse" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         </div>
         </div>
@@ -392,7 +346,7 @@ export default function LeadsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
-              {/* Tenant Information */}
+              {/* Tenant Information from tenants.csv */}
               <div>
                 <h3 className="font-semibold mb-2">Tenant Information</h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -401,12 +355,34 @@ export default function LeadsPage() {
                     <p className="font-medium">{selectedLead.tenant?.name || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Phone</p>
+                    <p className="text-sm text-muted-foreground">Mobile</p>
                     <p className="font-medium">{selectedLead.tenant?.phone || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">City</p>
-                    <p className="font-medium">{selectedLead.tenant?.city || 'N/A'}</p>
+                    <p className="text-sm text-muted-foreground">Locality</p>
+                    <p className="font-medium">{selectedLead.tenant?.localities || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Budget</p>
+                    <p className="font-medium">
+                      {selectedLead.tenant?.budget_min && selectedLead.tenant?.budget_max
+                        ? `₹${selectedLead.tenant.budget_min} - ₹${selectedLead.tenant.budget_max}`
+                        : selectedLead.tenant?.budget_max
+                        ? `₹${selectedLead.tenant.budget_max}`
+                        : 'N/A'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">BHK Type</p>
+                    <p className="font-medium">{selectedLead.tenant?.bedrooms ? `${selectedLead.tenant.bedrooms} BHK` : 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Must Need Amenities</p>
+                    <p className="font-medium">{selectedLead.tenant?.amenities || 'N/A'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground">Others</p>
+                    <p className="font-medium">{selectedLead.tenant?.preferences || 'N/A'}</p>
                   </div>
                 </div>
               </div>
