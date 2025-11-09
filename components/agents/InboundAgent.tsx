@@ -48,8 +48,8 @@ export default function InboundAgent({ calleeName, propertyCode }: InboundAgentP
       if (typeof loadAgent !== 'undefined') {
         // @ts-ignore
         loadAgent({
-          agentId: '93a4364f-562a-49bf-9aa4-fba317f7c1b4',
-          xApiKey: 'eb1f8fa4-f149-4f40-9ca2-323037e80311',
+          agentId: '91312a1a-f2c3-42dc-a0c7-4e532d90257b',
+          xApiKey: '5d001a13-f975-4baa-a8b6-e61fce1e8e98',
           variables: {
             ...(calleeName && { callee_name: calleeName }),
             ...(propertyCode && { property_code: propertyCode })
